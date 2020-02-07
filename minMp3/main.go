@@ -30,9 +30,9 @@ func main() {
 			ffmpegPath := path + "ffmpeg.exe"
 			cmd := exec.Command(ffmpegPath,
 				"-i", name,
-				"-b:a", "32k",
+				"-b:a", "16k",
 				"-acodec", "mp3",
-				"-ar", "44100",
+				"-ar", "11025",
 				"-ac", "1", outFile)
 			// 获取输出对象，可以从该对象中读取输出结果
 			stdout, err := cmd.StdoutPipe()
