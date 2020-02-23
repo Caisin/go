@@ -1,8 +1,8 @@
 package crawler
 
 import (
-	"errors"
 	"fmt"
+	"github.com/gocolly/colly"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -15,19 +15,47 @@ import (
 )
 
 type Crawler struct {
-	Pdfg     *wk.PDFGenerator
-	DelHtml  bool
-	htmlPath string
-	StartUrl string
-	Name     string
-	OutPath  string
-	Path     string
-	Domain   string
-	uri      *url.URL
-	PoolSize int
+	Pdfg         *wk.PDFGenerator
+	DelHtml      bool
+	htmlPath     string
+	htmTemplate  string
+	StartUrl     string
+	Name         string
+	OutPath      string
+	Path         string
+	Domain       string
+	bodySelector string
+	menuSelector string
+	menuIndex    map[string]int
+	uri          *url.URL
+	PoolSize     int
+	colly        *colly.Collector
 }
 
-func NewCrawler(startUrl, name, outPath string) (*Crawler, error) {
+//添加内容
+func (c *Crawler) AddBodyListener() {
+	c.colly.OnHTML(c.bodySelector, func(e *colly.HTMLElement) {
+		html, err := e.DOM.Parent().Html()
+		imgs := e.ChildAttrs("img", "src")
+		//html, err := e.DOM.Html()
+		isErr(err)
+		tempMap := map[string]byte{}
+		for _, img := range imgs {
+			tempMap[img] = 1
+		}
+		for s := range tempMap {
+			absoluteURL := e.Request.AbsoluteURL(s)
+			html = strings.Replace(html, s, absoluteURL, -1)
+		}
+		replace := strings.Replace(c.htmTemplate, "{content}", html, -1)
+		replace = strings.Replace(replace, "{start_url}", c.StartUrl, -1)
+		absoluteURL := e.Request.AbsoluteURL(e.Request.URL.RequestURI())
+		i := c.menuIndex[absoluteURL]
+		log.Printf("url is %s,index is %d", absoluteURL, i)
+		err = ioutil.WriteFile(fmt.Sprintf("%s/%.4d.html", c.htmlPath, i), []byte(replace), os.ModePerm)
+	})
+}
+func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector string) (*Crawler, error) {
 	parse, err := url.Parse(startUrl)
 	if err != nil {
 		return nil, err
@@ -36,33 +64,48 @@ func NewCrawler(startUrl, name, outPath string) (*Crawler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Crawler{
-		Pdfg:     pdfg,
-		DelHtml:  false,
-		StartUrl: startUrl,
-		Name:     name,
-		OutPath:  outPath,
-		htmlPath: outPath + "/html/",
-		Path:     parse.Path,
-		Domain:   parse.Scheme + "://" + parse.Hostname(),
-		uri:      parse,
-		PoolSize: 20,
-	}, nil
-}
-
-//解析菜单
-func (c *Crawler) Request() ([]string, error) {
-	return nil, errors.New("not implement")
+	collector := colly.NewCollector()
+	htmlPath := outPath + "/html/"
+	crawler := &Crawler{
+		Pdfg:         pdfg,
+		DelHtml:      false,
+		StartUrl:     startUrl,
+		Name:         name,
+		OutPath:      outPath,
+		htmlPath:     htmlPath,
+		Path:         parse.Path,
+		Domain:       parse.Scheme + "://" + parse.Hostname(),
+		uri:          parse,
+		PoolSize:     10,
+		colly:        collector,
+		htmTemplate:  htmTemplate,
+		bodySelector: bodySelector,
+		menuSelector: menuSelector,
+	}
+	return crawler, nil
 }
 
 //解析菜单
 func (c *Crawler) ParseMenu() ([]string, error) {
-	return nil, errors.New("not implement")
+	var menus []string
+	c.colly.OnHTML("html", func(e *colly.HTMLElement) {
+		attrs := e.ChildAttrs(c.menuSelector, "href")
+		m := map[string]int{}
+		for i := range attrs {
+			absoluteURL := e.Request.AbsoluteURL(attrs[i])
+			menus = append(menus, absoluteURL)
+			m[absoluteURL] = i
+		}
+		c.menuIndex = m
+	})
+	_ = c.colly.Visit(c.StartUrl)
+	c.colly.Wait()
+	return menus, nil
 }
 
 //解析菜单
-func (c *Crawler) ParseBody(url string) (string, error) {
-	return "", errors.New("not implement")
+func (c *Crawler) ParseBody() string {
+	panic("not implement")
 }
 
 func (c *Crawler) Run() {
@@ -74,24 +117,21 @@ func (c *Crawler) Run() {
 	if isErr(err) {
 		return
 	}
+	os.MkdirAll(c.htmlPath, os.ModePerm)
 	defer pool.Release()
 	var wg sync.WaitGroup
+	log.Println(len(c.menuIndex))
+	c.AddBodyListener()
 	for i := range menus {
 		wg.Add(1)
+		link := menus[i]
 		_ = pool.Submit(func() {
-			c.body2File(&wg, i)
+			_ = c.colly.Visit(link)
+			wg.Done()
 		})
 	}
 	wg.Wait()
 	err = c.Htm2Pdf()
-	isErr(err)
-}
-
-func (c *Crawler) body2File(wg *sync.WaitGroup, idx int) {
-	defer wg.Done()
-	body, err := c.ParseBody()
-	isErr(err)
-	err = ioutil.WriteFile(fmt.Sprintf("%s/%5d.html", c.htmlPath, idx), []byte(body), 0777)
 	isErr(err)
 }
 
