@@ -145,8 +145,8 @@ func isErr(err error) bool {
 func (c *Crawler) PdfGSetting() {
 	c.Pdfg.MarginRight.Set(0)
 	c.Pdfg.MarginLeft.Set(0)
-	c.Pdfg.MarginTop.Set(10)
-	c.Pdfg.MarginBottom.Set(10)
+	c.Pdfg.MarginTop.Set(4)
+	c.Pdfg.MarginBottom.Set(4)
 	c.Pdfg.PageSize.Set(wk.PageSizeA4)
 }
 
