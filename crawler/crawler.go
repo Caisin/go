@@ -5,6 +5,7 @@ import (
 	"github.com/gocolly/colly"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ import (
 type Crawler struct {
 	Pdfg         *wk.PDFGenerator
 	DelHtml      bool
+	GenPdf       bool
 	htmlPath     string
 	htmTemplate  string
 	StartUrl     string
@@ -24,9 +26,11 @@ type Crawler struct {
 	OutPath      string
 	Path         string
 	Domain       string
+	Host         string
 	bodySelector string
 	menuSelector string
-	menuIndex    map[string]int
+	menuMapping  map[string]string
+	Cookies      map[string]string
 	uri          *url.URL
 	PoolSize     int
 	colly        *colly.Collector
@@ -35,24 +39,52 @@ type Crawler struct {
 //添加内容
 func (c *Crawler) AddBodyListener() {
 	c.colly.OnHTML(c.bodySelector, func(e *colly.HTMLElement) {
-		html, err := e.DOM.Parent().Html()
+		html, err := e.DOM.Html()
 		imgs := e.ChildAttrs("img", "src")
 		//html, err := e.DOM.Html()
 		isErr(err)
 		tempMap := map[string]byte{}
+		//go没有set
 		for _, img := range imgs {
 			tempMap[img] = 1
 		}
+		//处理图片url
 		for s := range tempMap {
 			absoluteURL := e.Request.AbsoluteURL(s)
 			html = strings.Replace(html, s, absoluteURL, -1)
 		}
+
+		//处理a标签url
+		hrefs := e.ChildAttrs("a", "href")
+		for _, href := range hrefs {
+			absoluteURL := e.Request.AbsoluteURL(href)
+			localUrl := c.menuMapping[absoluteURL]
+			if len(localUrl) > 0 {
+				html = strings.Replace(html, href, localUrl, -1)
+			}
+		}
+
+		//处理a标签url
+		scripts := e.ChildAttrs("script", "src")
+		for _, href := range scripts {
+			absoluteURL := e.Request.AbsoluteURL(href)
+			html = strings.Replace(html, href, absoluteURL, -1)
+		}
+
+		//处理a标签url
+		links := e.ChildAttrs("link", "href")
+		for _, href := range links {
+			absoluteURL := e.Request.AbsoluteURL(href)
+			html = strings.Replace(html, href, absoluteURL, -1)
+		}
+
 		replace := strings.Replace(c.htmTemplate, "{content}", html, -1)
 		replace = strings.Replace(replace, "{start_url}", c.StartUrl, -1)
+		replace = strings.Replace(replace, "{Domain}", c.Domain, -1)
 		absoluteURL := e.Request.AbsoluteURL(e.Request.URL.RequestURI())
-		i := c.menuIndex[absoluteURL]
-		log.Printf("url is %s,index is %d", absoluteURL, i)
-		err = ioutil.WriteFile(fmt.Sprintf("%s/%.4d.html", c.htmlPath, i), []byte(replace), os.ModePerm)
+		i := c.menuMapping[absoluteURL]
+		log.Printf("url is %s,index is %s", absoluteURL, i)
+		err = ioutil.WriteFile(fmt.Sprintf("%s/%s", c.htmlPath, i), []byte(replace), os.ModePerm)
 	})
 }
 func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector string) (*Crawler, error) {
@@ -65,7 +97,7 @@ func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector
 		return nil, err
 	}
 	collector := colly.NewCollector()
-	htmlPath := outPath + "/html/"
+	htmlPath := outPath + "/" + name + "/html/"
 	crawler := &Crawler{
 		Pdfg:         pdfg,
 		DelHtml:      false,
@@ -75,12 +107,14 @@ func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector
 		htmlPath:     htmlPath,
 		Path:         parse.Path,
 		Domain:       parse.Scheme + "://" + parse.Hostname(),
+		Host:         parse.Hostname(),
 		uri:          parse,
 		PoolSize:     10,
 		colly:        collector,
 		htmTemplate:  htmTemplate,
 		bodySelector: bodySelector,
 		menuSelector: menuSelector,
+		GenPdf:       true,
 	}
 	return crawler, nil
 }
@@ -90,25 +124,37 @@ func (c *Crawler) ParseMenu() ([]string, error) {
 	var menus []string
 	c.colly.OnHTML("html", func(e *colly.HTMLElement) {
 		attrs := e.ChildAttrs(c.menuSelector, "href")
-		m := map[string]int{}
+		m := map[string]string{}
 		for i := range attrs {
 			absoluteURL := e.Request.AbsoluteURL(attrs[i])
 			menus = append(menus, absoluteURL)
-			m[absoluteURL] = i
+			m[absoluteURL] = fmt.Sprintf("%.4d.html", i)
 		}
-		c.menuIndex = m
+		c.menuMapping = m
 	})
 	_ = c.colly.Visit(c.StartUrl)
 	c.colly.Wait()
 	return menus, nil
 }
 
-//解析菜单
-func (c *Crawler) ParseBody() string {
-	panic("not implement")
+func (c *Crawler) InitParam() {
+	if c.Cookies != nil {
+		cookies := make([]*http.Cookie, len(c.Cookies))
+		i := 0
+		for k, v := range c.Cookies {
+			cookie := new(http.Cookie)
+			cookie.Name = k
+			cookie.Value = v
+			cookie.Path = "/"
+			cookie.Domain = c.Host
+			cookies[i] = cookie
+			i++
+		}
+		_ = c.colly.SetCookies("http://grace.hcoder.net", cookies)
+	}
 }
-
 func (c *Crawler) Run() {
+	c.InitParam()
 	menus, err := c.ParseMenu()
 	if isErr(err) {
 		return
@@ -117,10 +163,10 @@ func (c *Crawler) Run() {
 	if isErr(err) {
 		return
 	}
-	os.MkdirAll(c.htmlPath, os.ModePerm)
+	_ = os.MkdirAll(c.htmlPath, os.ModePerm)
 	defer pool.Release()
 	var wg sync.WaitGroup
-	log.Println(len(c.menuIndex))
+	log.Println(len(c.menuMapping))
 	c.AddBodyListener()
 	for i := range menus {
 		wg.Add(1)
@@ -131,8 +177,10 @@ func (c *Crawler) Run() {
 		})
 	}
 	wg.Wait()
-	err = c.Htm2Pdf()
-	isErr(err)
+	if c.GenPdf {
+		err = c.Htm2Pdf()
+		isErr(err)
+	}
 }
 
 func isErr(err error) bool {
