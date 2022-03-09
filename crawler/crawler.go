@@ -18,6 +18,7 @@ import (
 type Crawler struct {
 	Pdfg         *wk.PDFGenerator
 	DelHtml      bool
+	TimeOut      time.Duration
 	GenPdf       bool
 	htmlPath     string
 	htmTemplate  string
@@ -114,6 +115,7 @@ func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector
 		Domain:       parse.Scheme + "://" + parse.Hostname(),
 		Host:         parse.Hostname(),
 		uri:          parse,
+		TimeOut:      time.Minute,
 		PoolSize:     10,
 		FontSize:     "30px",
 		colly:        collector,
@@ -156,6 +158,7 @@ func (c *Crawler) ParseMenu() ([]string, error) {
 }
 
 func (c *Crawler) InitParam() {
+	c.colly.SetRequestTimeout(c.TimeOut)
 	if c.Cookies != nil {
 		cookies := make([]*http.Cookie, len(c.Cookies))
 		i := 0
@@ -186,7 +189,6 @@ func (c *Crawler) Run() {
 	var wg sync.WaitGroup
 	log.Println(len(c.menuMapping))
 	c.AddBodyListener()
-	c.colly.SetRequestTimeout(time.Minute)
 	for i := range menus {
 		link := menus[i]
 		wg.Add(1)
