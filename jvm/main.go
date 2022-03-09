@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Caisin/goLearn/jvm/classpath"
+	"golearn/jvm/classpath"
 	"strings"
 )
 

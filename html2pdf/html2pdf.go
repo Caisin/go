@@ -1,14 +1,14 @@
 package html2pdf
 
 import (
-	wk "github.com/Caisin/golearn/wkhtmltopdf"
+	wk "golearn/wkhtmltopdf"
 	"io/ioutil"
 	"log"
 	"strings"
 )
 
 func Html2pdf() {
-	dir := "E:/code/Python/html2pdf/out/Go语言圣经（中文版）/html/"
+	dir := "D:/work/code/go/goLearn/out/Flutter实战·第二版/html/"
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Fatalln(err)
@@ -35,6 +35,6 @@ func Html2pdf() {
 	page := wk.NewPageReader(reader)
 	pdfg.AddPage(page)
 	_ = pdfg.Create()
-	_ = pdfg.WriteFile("./Go语言圣经.pdf")
+	_ = pdfg.WriteFile("./Flutter实战·第二版-xx.pdf")
 
 }

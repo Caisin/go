@@ -1,7 +1,7 @@
 package html2pdf
 
 import (
-	"github.com/Caisin/golearn/crawler"
+	"golearn/crawler"
 )
 
 type GraceUICrawler struct {

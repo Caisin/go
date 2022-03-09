@@ -1,6 +1,10 @@
 package html2pdf
 
 import (
+	"io/ioutil"
+	"os"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -136,5 +140,48 @@ func TestGraceUICrawlerHtml(t *testing.T) {
 		"graceLoaclUser": "%5B%22150600%22%2C%225eadd7058da54%22%5D",
 	}
 	crawler.GenPdf = false
+	crawler.Run()
+}
+
+func TestFlutter_Run(t *testing.T) {
+	os.Setenv("WKHTMLTOPDF_PATH", "D:/work/software/wkhtmltopdf/bin")
+	file, _ := ioutil.ReadFile("D:/work/code/go/goLearn/html2pdf/Flutter.html")
+	htmlTemplate := string(file)
+	crawler, err := NewGitBookCrawler("https://book.flutterchina.club",
+		"Flutter实战·第二版",
+		"D:/work/code/go/goLearn/out",
+		htmlTemplate, "main.page div.theme-default-content", "aside.sidebar .sidebar-links a")
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	crawler.GenPdf = true
+	crawler.MenuSorter = func(menus []string) []string {
+		sort.Slice(menus, func(i, j int) bool {
+			/*c := "chapter"
+			a := menus[i]
+			b := menus[j]
+			if strings.Contains(a, c) && !strings.Contains(b, c) {
+				return false
+			}
+			dira := path.Dir(a)
+			dirb := path.Dir(b)
+			if dira == dirb {
+				if strings.Contains(a, "index") && !strings.Contains(b, "index") {
+					return false
+				}
+			}
+			aN := cast.ToInt(strings.ReplaceAll(dira, c, ""))
+			bN := cast.ToInt(strings.ReplaceAll(dirb, c, ""))
+			if aN > bN {
+				return false
+			}*/
+			return false
+		})
+		for i, menu := range menus {
+			menus[i] = strings.ReplaceAll(strings.ReplaceAll(menu, " ", ""), ".md", "")
+		}
+		return menus
+	}
 	crawler.Run()
 }
