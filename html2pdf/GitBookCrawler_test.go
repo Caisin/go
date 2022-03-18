@@ -2,7 +2,6 @@ package html2pdf
 
 import (
 	"io/ioutil"
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -18,10 +17,10 @@ func TestGitBookCrawler_Run(t *testing.T) {
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 	<meta name="description" content="">
 	<meta charset="UTF-8">
-	<link rel="stylesheet" href="{start_url}/gitbook/style.css">
-	<link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-katex/katex.min.css">
-	<link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-highlight/website.css">
-	<link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-fontsettings/website.css">
+    <link rel="stylesheet" href="{start_url}/gitbook/style.css">
+    <link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-highlight/website.css">
+    <link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-search/search.css">
+    <link rel="stylesheet" href="{start_url}/gitbook/gitbook-plugin-fontsettings/website.css">
 	<meta name="HandheldFriendly" content="true"/>
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 	<meta name="apple-mobile-web-app-capable" content="yes">
@@ -40,9 +39,9 @@ func TestGitBookCrawler_Run(t *testing.T) {
 	</body>
 	</html>
 		`
-	crawler, err := NewGitBookCrawler("http://localhost/gitbook",
-		"Go语言圣经",
-		"E:/code/golang/goLearn/out",
+	crawler, err := NewGitBookCrawler("https://guoshuyu.cn/home/wx",
+		"GsyFlutter实战",
+		"../out",
 		htmlTemplate, "section.markdown-section", "ul.summary a")
 	if err != nil {
 		t.Error(err.Error())
@@ -144,12 +143,55 @@ func TestGraceUICrawlerHtml(t *testing.T) {
 }
 
 func TestFlutter_Run(t *testing.T) {
-	os.Setenv("WKHTMLTOPDF_PATH", "D:/work/software/wkhtmltopdf/bin")
-	file, _ := ioutil.ReadFile("D:/work/code/go/goLearn/html2pdf/Flutter.html")
+	//os.Setenv("WKHTMLTOPDF_PATH", "D:/work/software/wkhtmltopdf/bin")
+	file, _ := ioutil.ReadFile("Flutter.html")
 	htmlTemplate := string(file)
 	crawler, err := NewGitBookCrawler("https://book.flutterchina.club",
 		"Flutter实战·第二版",
-		"D:/work/code/go/goLearn/out",
+		"../out",
+		htmlTemplate, "main.page div.theme-default-content", "aside.sidebar .sidebar-links a")
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	crawler.GenPdf = true
+	crawler.MenuSorter = func(menus []string) []string {
+		sort.Slice(menus, func(i, j int) bool {
+			/*c := "chapter"
+			a := menus[i]
+			b := menus[j]
+			if strings.Contains(a, c) && !strings.Contains(b, c) {
+				return false
+			}
+			dira := path.Dir(a)
+			dirb := path.Dir(b)
+			if dira == dirb {
+				if strings.Contains(a, "index") && !strings.Contains(b, "index") {
+					return false
+				}
+			}
+			aN := cast.ToInt(strings.ReplaceAll(dira, c, ""))
+			bN := cast.ToInt(strings.ReplaceAll(dirb, c, ""))
+			if aN > bN {
+				return false
+			}*/
+			return false
+		})
+		for i, menu := range menus {
+			menus[i] = strings.ReplaceAll(strings.ReplaceAll(menu, " ", ""), ".md", "")
+		}
+		return menus
+	}
+	crawler.Run()
+}
+
+func TestGsyFlutter_Run(t *testing.T) {
+	//os.Setenv("WKHTMLTOPDF_PATH", "D:/work/software/wkhtmltopdf/bin")
+	file, _ := ioutil.ReadFile("Flutter.html")
+	htmlTemplate := string(file)
+	crawler, err := NewGitBookCrawler("https://book.flutterchina.club",
+		"Flutter实战·第二版",
+		"../out",
 		htmlTemplate, "main.page div.theme-default-content", "aside.sidebar .sidebar-links a")
 	if err != nil {
 		t.Error(err.Error())

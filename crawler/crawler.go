@@ -28,7 +28,7 @@ type Crawler struct {
 	Path         string
 	Domain       string
 	Host         string
-	FontSize     string
+	FontSize     int
 	bodySelector string
 	menuSelector string
 	MenuSorter   func([]string) []string
@@ -85,7 +85,10 @@ func (c *Crawler) AddBodyListener() {
 		replace := strings.Replace(c.htmTemplate, "{content}", html, -1)
 		replace = strings.Replace(replace, "{start_url}", c.StartUrl, -1)
 		replace = strings.Replace(replace, "{Domain}", c.Domain, -1)
-		replace = strings.Replace(replace, "{fontSize}", c.FontSize, -1)
+		replace = strings.Replace(replace, "{fontSize}", fmt.Sprintf("%dpx", c.FontSize), -1)
+		replace = strings.Replace(replace, "{h1Size}", fmt.Sprintf("%dpx", c.FontSize+30), -1)
+		replace = strings.Replace(replace, "{h2Size}", fmt.Sprintf("%dpx", c.FontSize+20), -1)
+		replace = strings.Replace(replace, "{h3Size}", fmt.Sprintf("%dpx", c.FontSize+10), -1)
 		absoluteURL := e.Request.AbsoluteURL(e.Request.URL.RequestURI())
 		i := c.menuMapping[absoluteURL]
 		log.Printf("url is %s ,index is %s", absoluteURL, i)
@@ -117,7 +120,7 @@ func NewCrawler(startUrl, name, outPath, htmTemplate, bodySelector, menuSelector
 		uri:          parse,
 		TimeOut:      time.Minute,
 		PoolSize:     10,
-		FontSize:     "30px",
+		FontSize:     30,
 		colly:        collector,
 		htmTemplate:  htmTemplate,
 		bodySelector: bodySelector,
